@@ -13,8 +13,12 @@
     With no project name the script renders an interactive terminal prompt.
     A project name can also be supplied directly from the command line.
 
+    The commands are "new-project", "config", "config setup", "uninstall" and
+    "help". Every flag is written with one dash followed by the name, for
+    example -NoLaunch. -Help prints the full list, it is the only help flag.
+
 .PARAMETER CommandOrName
-    Optional subcommand ("new-project", "config", "setup", "uninstall", "help"),
+    Optional subcommand ("new-project", "config", "uninstall", "help"),
     or the project name itself.
 
 .PARAMETER ProjectName
@@ -48,6 +52,15 @@
 .PARAMETER Force
     Skip the uninstall confirmation prompt.
 
+.PARAMETER Ascii
+    Use plain ASCII borders instead of Unicode box drawing characters.
+
+.PARAMETER NoLaunch
+    Create the project but do not open it in Premiere Pro.
+
+.EXAMPLE
+    .\premiere.ps1 -Help
+
 .EXAMPLE
     .\premiere.ps1
 
@@ -69,12 +82,8 @@
 .EXAMPLE
     .\premiere.ps1 -NoLaunch "Test project"
 #>
-[CmdletBinding()]
 param(
-    [Parameter(Position = 0)]
     [string]$CommandOrName,
-
-    [Parameter(Position = 1)]
     [string]$ProjectName,
 
     # Optional one-run overrides. Normal settings live in config.json.
@@ -94,9 +103,7 @@ param(
     [switch]$Ascii,
 
     # Create the project but do not open it (useful for testing).
-    [switch]$NoLaunch,
-
-    [switch]$Help
+    [switch]$NoLaunch
 )
 
 Set-StrictMode -Version Latest
@@ -342,9 +349,12 @@ function New-TuiFrame {
     $dimensions = Get-ConsoleDimensions
     $windowWidth = [Math]::Max(16, [int]$dimensions.Width)
     $boxWidth = [Math]::Min(76, [Math]::Max(18, $windowWidth - 2))
-    $margin = [Math]::Max(0, [int]([Math]::Floor(($windowWidth - $boxWidth) / 2)))
+    $margin = 0
     $textWidth = [Math]::Max(4, $boxWidth - 6)
-    $inputWidth = [Math]::Max(2, $textWidth - 2)
+
+    # The label and the input share one line so the prompt stays compact.
+    $label = 'Enter project name:'
+    $inputWidth = [Math]::Max(2, $textWidth - $label.Length - 4)
 
     $borderColor = [ConsoleColor]::DarkGray
     $g = $script:Glyphs
@@ -359,16 +369,6 @@ function New-TuiFrame {
         (New-Segment -Text $g.BottomLeft -Color $borderColor),
         (New-Segment -Text (Repeat-Text $g.Horizontal ([Math]::Max(0, $boxWidth - 2))) -Color $borderColor),
         (New-Segment -Text $g.BottomRight -Color $borderColor)
-    )
-
-    $titleLine = New-BorderedLine -BoxWidth $boxWidth -TextWidth $textWidth -BorderColor $borderColor -Segments @(
-        (New-Segment -Text 'premiere-tui' -Color ([ConsoleColor]::Cyan))
-    )
-
-    $blankLine = New-BorderedLine -BoxWidth $boxWidth -TextWidth $textWidth -BorderColor $borderColor -Segments @()
-
-    $labelLine = New-BorderedLine -BoxWidth $boxWidth -TextWidth $textWidth -BorderColor $borderColor -Segments @(
-        (New-Segment -Text (Get-TruncatedText 'Enter project name:' $textWidth) -Color ([ConsoleColor]::White))
     )
 
     # Build the input field: caret + placeholder, or text split at the caret.
@@ -403,17 +403,14 @@ function New-TuiFrame {
     }
 
     $inputContent = @(
+        (New-Segment -Text $label -Color ([ConsoleColor]::White)),
+        (New-Segment -Text ' ' -Color ([ConsoleColor]::White)),
         (New-Segment -Text $g.Prompt -Color ([ConsoleColor]::Cyan)),
         (New-Segment -Text ' ' -Color ([ConsoleColor]::Gray))
     )
     $inputContent += $inputSegments
 
     $inputLine = New-BorderedLine -BoxWidth $boxWidth -TextWidth $textWidth -BorderColor $borderColor -Segments $inputContent
-
-    $underlineLine = New-BorderedLine -BoxWidth $boxWidth -TextWidth $textWidth -BorderColor $borderColor -Segments @(
-        (New-Segment -Text '  ' -Color $borderColor),
-        (New-Segment -Text (Repeat-Text $g.Horizontal $inputWidth) -Color $borderColor)
-    )
 
     if ($errorText.Length -gt 0) {
         $statusLine = New-BorderedLine -BoxWidth $boxWidth -TextWidth $textWidth -BorderColor $borderColor -Segments @(
@@ -443,12 +440,7 @@ function New-TuiFrame {
         Width  = $boxWidth
         Lines  = @(
             $topBorder,
-            $titleLine,
-            $blankLine,
-            $labelLine,
             $inputLine,
-            $underlineLine,
-            $blankLine,
             $statusLine,
             $bottomBorder,
             $footerLine
@@ -496,6 +488,90 @@ function Write-TuiFrame {
 
         $row++
     }
+}
+
+function Get-CursorRow {
+    # The row the cursor sits on, or -1 when the console cannot report it.
+    try {
+        return [int][Console]::CursorTop
+    } catch {
+        return -1
+    }
+}
+
+function Test-ConsoleCursor {
+    # True when the console supports moving the cursor, which is what an
+    # inline prompt needs to redraw itself in place.
+    try {
+        $null = [Console]::CursorTop
+        return $true
+    } catch {
+        return $false
+    }
+}
+
+function Write-InlineFrame {
+    # Draws a frame at the current cursor position and leaves the cursor on the
+    # line below it. Nothing above the frame is touched, so the output of the
+    # shell keeps the place it had.
+    param([object]$Frame)
+
+    foreach ($line in $Frame.Lines) {
+        $used = 0
+        foreach ($segment in $line.Segments) {
+            $remaining = $line.Width - $used
+            if ($remaining -le 0) {
+                break
+            }
+
+            $segmentText = [string]$segment.Text
+            if ($segmentText.Length -eq 0) {
+                continue
+            }
+            if ($segmentText.Length -gt $remaining) {
+                $segmentText = $segmentText.Substring(0, $remaining)
+            }
+
+            [Console]::ForegroundColor = [ConsoleColor]$segment.Color
+            [Console]::Write($segmentText)
+            $used += $segmentText.Length
+        }
+
+        if ($used -lt $line.Width) {
+            [Console]::ForegroundColor = [ConsoleColor]::DarkGray
+            [Console]::Write((Repeat-Text ' ' ($line.Width - $used)))
+        }
+
+        [Console]::Write("`r`n")
+    }
+}
+
+function Clear-InlineFrame {
+    # Blanks a frame that was drawn before, used when the terminal changed size
+    # and the frame has to be drawn again with a different width.
+    param(
+        [int]$Top,
+        [int]$Rows,
+        [int]$Width
+    )
+
+    if ($Top -lt 0 -or $Rows -le 0 -or $Width -le 0) {
+        return
+    }
+
+    for ($row = 0; $row -lt $Rows; $row++) {
+        try {
+            [Console]::SetCursorPosition(0, $Top + $row)
+        } catch {
+            return
+        }
+        [Console]::ForegroundColor = [ConsoleColor]::DarkGray
+        [Console]::Write((Repeat-Text ' ' $Width))
+    }
+
+    try {
+        [Console]::SetCursorPosition(0, $Top + $Rows)
+    } catch { }
 }
 
 # =========================================================================
@@ -1817,7 +1893,8 @@ function Read-ProjectNameInteractive {
     $originalTitle = $null
     $originalForeground = [Console]::ForegroundColor
     $originalTreatControlCAsInput = $false
-    $lastDimensions = ''
+    $frameTop = -1
+    $frameWidth = 0
 
     try {
         try { $originalCursorVisible = [Console]::CursorVisible } catch { }
@@ -1831,20 +1908,32 @@ function Read-ProjectNameInteractive {
         } catch { }
         try { [Console]::CursorVisible = $false } catch { }
 
-        Clear-Host
-        $initialDimensions = Get-ConsoleDimensions
-        $lastDimensions = "$($initialDimensions.Width)x$($initialDimensions.Height)"
-
         while ($true) {
-            $dimensions = Get-ConsoleDimensions
-            $dimensionKey = "$($dimensions.Width)x$($dimensions.Height)"
-            if ($dimensionKey -ne $lastDimensions) {
-                Clear-Host
-                $lastDimensions = $dimensionKey
+            $frame = New-TuiFrame -Text $text -Cursor $cursor -ErrorMessage $errorText
+            $frameRows = @($frame.Lines).Count
+
+            # Redraw the frame where it already is, so the prompt keeps its
+            # place in the scrollback instead of taking over the screen.
+            if ($frameTop -ge 0) {
+                if ($frame.Width -ne $frameWidth) {
+                    Clear-InlineFrame -Top $frameTop -Rows $frameRows -Width $frameWidth
+                    $frameTop = -1
+                } else {
+                    try {
+                        [Console]::SetCursorPosition(0, $frameTop)
+                    } catch {
+                        $frameTop = -1
+                    }
+                }
             }
 
-            $frame = New-TuiFrame -Text $text -Cursor $cursor -ErrorMessage $errorText
-            Write-TuiFrame -Frame $frame
+            Write-InlineFrame -Frame $frame
+
+            $afterRow = Get-CursorRow
+            if ($afterRow -ge 0) {
+                $frameTop = $afterRow - $frameRows
+            }
+            $frameWidth = $frame.Width
 
             $key = [Console]::ReadKey($true)
             $isControl = (($key.Modifiers -band [ConsoleModifiers]::Control) -ne 0)
@@ -1923,7 +2012,6 @@ function Read-ProjectNameInteractive {
             }
         }
     } finally {
-        try { Clear-Host } catch { }
         try { [Console]::CursorVisible = $originalCursorVisible } catch { }
         try { [Console]::ForegroundColor = $originalForeground } catch { }
         try { [Console]::TreatControlCAsInput = $originalTreatControlCAsInput } catch { }
@@ -1936,7 +2024,7 @@ function Read-ProjectNameInteractive {
 }
 
 function Read-ProjectName {
-    if (-not $script:IsInteractive) {
+    if (-not $script:IsInteractive -or -not (Test-ConsoleCursor)) {
         Write-Host ''
         Write-Host '  Enter project name:' -ForegroundColor ([ConsoleColor]::White)
         Write-Host '  > ' -NoNewline -ForegroundColor ([ConsoleColor]::Cyan)
@@ -1975,21 +2063,29 @@ function Show-Usage {
     Write-Host '  Create a new Premiere Pro project from your master template.' -ForegroundColor ([ConsoleColor]::DarkGray)
     Write-Host ''
     Write-Host '  Usage:' -ForegroundColor ([ConsoleColor]::White)
-    Write-Host '    premiere-tui' -ForegroundColor ([ConsoleColor]::Gray)
-    Write-Host '    premiere-tui "My project"' -ForegroundColor ([ConsoleColor]::Gray)
-    Write-Host '    premiere-tui new-project "My project"' -ForegroundColor ([ConsoleColor]::Gray)
-    Write-Host "    .\$($script:ScriptName) config setup" -ForegroundColor ([ConsoleColor]::Gray)
-    Write-Host "    .\$($script:ScriptName) config" -ForegroundColor ([ConsoleColor]::Gray)
-    Write-Host "    .\$($script:ScriptName) uninstall" -ForegroundColor ([ConsoleColor]::Gray)
+    Write-Host '    premiere-tui                          Ask for the project name.' -ForegroundColor ([ConsoleColor]::Gray)
+    Write-Host '    premiere-tui "My project"             Create a project right away.' -ForegroundColor ([ConsoleColor]::Gray)
+    Write-Host '    premiere-tui new-project "My project" The same, spelled out.' -ForegroundColor ([ConsoleColor]::Gray)
+    Write-Host '    premiere-tui config                   Show the current settings.' -ForegroundColor ([ConsoleColor]::Gray)
+    Write-Host '    premiere-tui config setup             Change the settings.' -ForegroundColor ([ConsoleColor]::Gray)
+    Write-Host '    premiere-tui uninstall                Remove the app, config and profile entry.' -ForegroundColor ([ConsoleColor]::Gray)
+    Write-Host '    premiere-tui help                     Show this help.' -ForegroundColor ([ConsoleColor]::Gray)
     Write-Host ''
     Write-Host '  Options:' -ForegroundColor ([ConsoleColor]::White)
-    Write-Host '    -Ascii       Use plain ASCII borders instead of Unicode.' -ForegroundColor ([ConsoleColor]::DarkGray)
-    Write-Host '    -NoLaunch    Create the project without opening Premiere.' -ForegroundColor ([ConsoleColor]::DarkGray)
+    Write-Host '    -Help                        Show this help.' -ForegroundColor ([ConsoleColor]::DarkGray)
+    Write-Host '    -Ascii                       Use plain ASCII borders instead of Unicode.' -ForegroundColor ([ConsoleColor]::DarkGray)
+    Write-Host '    -NoLaunch                    Create the project without opening Premiere.' -ForegroundColor ([ConsoleColor]::DarkGray)
+    Write-Host '    -ConfigPath                  Use another config file.' -ForegroundColor ([ConsoleColor]::DarkGray)
+    Write-Host '    -TemplateFolder              Use another template folder for this run.' -ForegroundColor ([ConsoleColor]::DarkGray)
+    Write-Host '    -TemplateProjectFile         Use another .prproj inside the template.' -ForegroundColor ([ConsoleColor]::DarkGray)
+    Write-Host '    -ProjectsParentFolder        Put new project folders somewhere else for this run.' -ForegroundColor ([ConsoleColor]::DarkGray)
     Write-Host ''
     Write-Host '  Uninstall options:' -ForegroundColor ([ConsoleColor]::White)
     Write-Host '    -Force           Skip the confirmation prompt.' -ForegroundColor ([ConsoleColor]::DarkGray)
     Write-Host '    -NoProfile       Leave the PowerShell profile alone.' -ForegroundColor ([ConsoleColor]::DarkGray)
     Write-Host '    -RemoveBackups   Delete profile backups made by the installer.' -ForegroundColor ([ConsoleColor]::DarkGray)
+    Write-Host '    -InstallDir      Folder to remove. Default %LOCALAPPDATA%\premiere-tui.' -ForegroundColor ([ConsoleColor]::DarkGray)
+    Write-Host '    -ProfilePath     Profile to clean. Default $PROFILE.' -ForegroundColor ([ConsoleColor]::DarkGray)
     Write-Host ''
     Write-Host '  Configuration:' -ForegroundColor ([ConsoleColor]::White)
     Write-Host "    Config:    $configPath" -ForegroundColor ([ConsoleColor]::DarkGray)
@@ -1997,7 +2093,7 @@ function Show-Usage {
     Write-Host "    Master:    $master" -ForegroundColor ([ConsoleColor]::DarkGray)
     Write-Host "    Projects:  $($effective.projectsParentFolder)" -ForegroundColor ([ConsoleColor]::DarkGray)
     Write-Host ''
-    Write-Host "  $($g.Bullet) Run '.\$($script:ScriptName) config setup' to change these settings." -ForegroundColor ([ConsoleColor]::DarkGray)
+    Write-Host "  $($g.Bullet) Run 'premiere-tui config setup' to change these settings." -ForegroundColor ([ConsoleColor]::DarkGray)
     Write-Host "  $($g.Bullet) After install, 'ptui' is an alias for 'premiere-tui'." -ForegroundColor ([ConsoleColor]::DarkGray)
     Write-Host ''
 }
@@ -2015,9 +2111,42 @@ function Write-ErrorMessage {
 #  Main
 # =========================================================================
 
-if ($Help -or ([string]::IsNullOrWhiteSpace($ProjectName) -and $CommandOrName -in @('help', '-h', '--help', '/?'))) {
+if ([string]::IsNullOrWhiteSpace($ProjectName) -and $CommandOrName -eq 'help') {
     Show-Usage
     exit 0
+}
+
+# -------------------------------------------------------------------------
+#  flags
+# -------------------------------------------------------------------------
+# -Help is the only help flag and the only way to spell it. Everything the
+# binder did not recognize is reported here with the correct spelling.
+$helpRequested = $false
+$unknownOptions = @()
+foreach ($item in @($args)) {
+    if ([string]::IsNullOrWhiteSpace($item)) {
+        continue
+    }
+    if ($item -eq '-Help') {
+        $helpRequested = $true
+    } else {
+        $unknownOptions += $item
+    }
+}
+
+if ($helpRequested) {
+    Show-Usage
+    exit 0
+}
+
+if ($unknownOptions.Count -gt 0) {
+    Write-ErrorMessage "Unknown option '$($unknownOptions[0])'. Use: premiere-tui -Help for the list of flags."
+    exit 2
+}
+
+if ($CommandOrName -eq '/?') {
+    Write-ErrorMessage "'/?' is not a flag of this app. Use: premiere-tui -Help"
+    exit 2
 }
 
 # -------------------------------------------------------------------------
@@ -2026,7 +2155,7 @@ if ($Help -or ([string]::IsNullOrWhiteSpace($ProjectName) -and $CommandOrName -i
 if ($CommandOrName -eq 'config') {
     $configAction = 'show'
     if (-not [string]::IsNullOrWhiteSpace($ProjectName)) {
-        if ($ProjectName -in @('setup', 'edit')) {
+        if ($ProjectName -eq 'setup') {
             $configAction = 'setup'
         } else {
             Write-ErrorMessage "Unknown config action '$ProjectName'. Use: .\$($script:ScriptName) config setup"
@@ -2034,14 +2163,6 @@ if ($CommandOrName -eq 'config') {
         }
     }
     Invoke-ConfigCommand -Action $configAction
-    if (-not [string]::IsNullOrWhiteSpace([string]$script:ConfigCommandError)) {
-        exit 1
-    }
-    exit 0
-}
-
-if ($CommandOrName -eq 'setup') {
-    Invoke-ConfigCommand -Action 'setup'
     if (-not [string]::IsNullOrWhiteSpace([string]$script:ConfigCommandError)) {
         exit 1
     }
@@ -2150,15 +2271,26 @@ if ($null -ne $configError) {
 # -------------------------------------------------------------------------
 $projectNameFromCli = $null
 
+# Spellings that used to be commands. They are refused here so a typo never
+# turns into a project with a strange name.
+$retiredCommands = @{
+    'setup' = "premiere-tui config setup"
+    'new'   = "premiere-tui new-project 'name'"
+    'edit'  = "premiere-tui config setup"
+}
+
 if (-not [string]::IsNullOrWhiteSpace($ProjectName)) {
-    if (-not [string]::IsNullOrWhiteSpace($CommandOrName) -and $CommandOrName -notin @('new-project', 'new')) {
+    if (-not [string]::IsNullOrWhiteSpace($CommandOrName) -and $CommandOrName -ne 'new-project') {
         Write-ErrorMessage "Unknown command '$CommandOrName'. Use: .\$($script:ScriptName) new-project 'name'"
         exit 2
     }
     $projectNameFromCli = $ProjectName
 } elseif (-not [string]::IsNullOrWhiteSpace($CommandOrName)) {
-    if ($CommandOrName -in @('new-project', 'new')) {
+    if ($CommandOrName -eq 'new-project') {
         $projectNameFromCli = $null
+    } elseif ($retiredCommands.ContainsKey($CommandOrName.ToLowerInvariant())) {
+        Write-ErrorMessage "'$CommandOrName' is not a command of this app. Use: $($retiredCommands[$CommandOrName.ToLowerInvariant()])"
+        exit 2
     } elseif ($CommandOrName.StartsWith('-')) {
         Write-ErrorMessage "Unknown option '$CommandOrName'."
         exit 2

@@ -6,20 +6,15 @@ Create a new Adobe Premiere Pro project from a master template without leaving t
 
 ```
 ╭──────────────────────────────────────────────────────────────────────────╮
-│  premiere-tui                                                            │
-│                                                                          │
-│  Enter project name:                                                     │
-│  ❯ My amazing Premiere project▌                                          │
-│  ──────────────────────────────────────────────────────────────────────  │
-│                                                                          │
-│  → C:\Users\you\Documents\Adobe\Premiere Pro\26.0\Projects\My amazing…   │
+│  Enter project name: ❯ My amazing Premiere project▌                      │
+│  → …\Adobe\Premiere Pro\26.0\Projects\My amazing Premiere project        │
 ╰──────────────────────────────────────────────────────────────────────────╯
   enter to create • esc to quit
 ```
 
 ## Features
 
-- Interactive project-name prompt with a path preview.
+- Interactive project-name prompt with a path preview. It stays in place, it does not clear the terminal.
 - One command creates the folder, copies the template, renames the `.prproj`, and opens it.
 - Bundled template works out of the box.
 - Custom template folder and projects folder.
@@ -75,15 +70,46 @@ premiere-tui                              # interactive name prompt
 ptui                                      # same thing (alias)
 premiere-tui "My project"                 # create directly
 premiere-tui new-project "My project"     # same, explicit
-premiere-tui config setup                 # edit settings in the config TUI
 premiere-tui config                       # print current settings
+premiere-tui config setup                 # edit settings in the config TUI
 premiere-tui uninstall                    # remove the app, config, and profile entry
-premiere-tui -NoLaunch "Test"             # create without opening Premiere
-premiere-tui -Ascii                       # use ASCII borders
-premiere-tui -Help
+premiere-tui help                         # show the help
+premiere-tui -Help                        # show the help
 ```
 
+### Commands
+
+| Command | What it does |
+| --- | --- |
+| *(none)* | Asks for the project name, then creates the project. |
+| `new-project "name"` | Creates the project without asking for a name. |
+| `config` | Prints the current settings. |
+| `config setup` | Opens the config screen to change them. |
+| `uninstall` | Removes the app, the config, and the profile entry. |
+| `help` | Prints the help. |
+
+### Flags
+
+Every flag is spelled the same way: one dash, then the name, for example `-NoLaunch`. Anything else is refused with an error, so a typo never turns into a project with a strange name.
+
+| Flag | What it does |
+| --- | --- |
+| `-Help` | Show the help. This is the only help flag, `-h` and `--help` are not accepted. |
+| `-Ascii` | Use plain ASCII borders instead of Unicode box drawing characters. |
+| `-NoLaunch` | Create the project but do not open it in Premiere Pro. |
+| `-ConfigPath` | Use another config file. |
+| `-TemplateFolder` | Use another template folder for this run. |
+| `-TemplateProjectFile` | Use another `.prproj` inside the template for this run. |
+| `-ProjectsParentFolder` | Put new project folders somewhere else for this run. |
+| `-Force` | Uninstall: skip the confirmation prompt. |
+| `-NoProfile` | Uninstall: leave the PowerShell profile alone. |
+| `-RemoveBackups` | Uninstall: delete profile backups made by the installer. |
+| `-InstallDir` | Uninstall: the folder to remove. Defaults to `%LOCALAPPDATA%\premiere-tui`. |
+| `-ProfilePath` | Uninstall: the profile to clean. Defaults to `$PROFILE`. |
+
 Project names are validated before anything is copied. A project folder is never overwritten.
+
+The name prompt is drawn where you ran the command and keeps redrawing itself in that spot, so your scrollback is left alone and the result appears right below the prompt.
 
 ## Configuration
 
