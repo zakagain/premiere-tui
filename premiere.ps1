@@ -1092,6 +1092,7 @@ function Read-ConfigInteractive {
 function Invoke-ConfigCommand {
     param([string]$Action = 'show')
 
+    $script:ConfigCommandError = $null
     $existing = Read-Config
     $config = Get-EffectiveConfig -Config $existing
     $configPath = Get-ConfigPath
@@ -1137,6 +1138,7 @@ function Invoke-ConfigCommand {
 
             $result = Save-ConfigFromValues -Values @($templateValue, $projectsValue) -BaseConfig $config
             if (-not [string]::IsNullOrWhiteSpace([string]$result.Error)) {
+                $script:ConfigCommandError = [string]$result.Error
                 Write-ErrorMessage ([string]$result.Error)
                 return
             }
@@ -1181,6 +1183,107 @@ function Invoke-ConfigCommand {
     Write-Host ''
     Write-Host "  $($g.Bullet) Run '.\$($script:ScriptName) config setup' to change these settings." -ForegroundColor ([ConsoleColor]::DarkGray)
     Write-Host ''
+}
+
+function Get-LegacyFunctionEnd {
+    # Returns the index of the line that closes the function that starts on
+    # $Start, or -1 when it is never closed. Braces are counted instead of
+    # matched by a regex so an indented function is closed by its own brace
+    # and never by an enclosing block.
+    param([string[]]$Lines, [int]$Start)
+
+    $depth = 0
+    $seenOpen = $false
+    for ($i = $Start; $i -lt $Lines.Count; $i++) {
+        $opens = ([regex]::Matches($Lines[$i], '\{')).Count
+        $closes = ([regex]::Matches($Lines[$i], '\}')).Count
+        if (-not $seenOpen) {
+            if ($opens -gt 0) {
+                $seenOpen = $true
+            } else {
+                continue
+            }
+        }
+        $depth += $opens - $closes
+        if ($depth -le 0) {
+            return $i
+        }
+    }
+    return -1
+}
+
+function Remove-LegacyProfileEntries {
+    # Removes an unmarked premiere-tui function and its ptui alias. These were
+    # written by older installers and by the manual setup snippet, so they are
+    # removed line by line instead of by a pattern that could reach past the
+    # end of the definition.
+    param([string]$Content)
+
+    if ([string]::IsNullOrEmpty($Content)) {
+        return $Content
+    }
+
+    $newline = if ($Content.Contains("`r`n")) { "`r`n" } else { "`n" }
+    $lines = $Content -split "`r?`n"
+    $kept = New-Object System.Collections.Generic.List[string]
+    $index = 0
+    while ($index -lt $lines.Count) {
+        $line = $lines[$index]
+        if ($line -match '^[ \t]*function\s+(?:global:|script:)?premiere-tui\b') {
+            $end = Get-LegacyFunctionEnd -Lines $lines -Start $index
+            if ($end -ge $index) {
+                if ($kept.Count -gt 0 -and $kept[$kept.Count - 1] -match '^[ \t]*#\s*premiere-tui\s*$') {
+                    $kept.RemoveAt($kept.Count - 1)
+                }
+                $index = $end + 1
+                continue
+            }
+        }
+        $kept.Add($line)
+        $index++
+    }
+
+    $result = $kept -join $newline
+
+    # A leftover ptui alias points at a function that is being removed.
+    $result = [regex]::Replace($result, '(?im)^[ \t]*(?:Set-Alias|New-Alias)\s+[^\r\n]*\bptui\b[^\r\n]*\r?\n?', '')
+
+    return $result
+}
+
+function Remove-PremiereProfileEntries {
+    # Strips every premiere-tui entry from a PowerShell profile. Only the
+    # premiere-tui block and the legacy definition are touched, any other
+    # content in the profile is left exactly as it was.
+    param([string]$Content)
+
+    if ([string]::IsNullOrEmpty($Content)) {
+        return $Content
+    }
+
+    $startMarker = '# >>> premiere-tui >>>'
+    $endMarker = '# <<< premiere-tui <<<'
+
+    # The tempered dot stops a match from spanning a second start marker, so a
+    # half written block can never swallow the content around it.
+    $start = [regex]::Escape($startMarker)
+    $end = [regex]::Escape($endMarker)
+    $markedPattern = $start + '(?:(?!' + $start + ').)*?' + $end + '[ \t]*\r?\n?'
+    $stripped = [regex]::Replace(
+        $Content,
+        $markedPattern,
+        '',
+        [System.Text.RegularExpressions.RegexOptions]::Singleline
+    )
+
+    $stripped = Remove-LegacyProfileEntries -Content $stripped
+
+    # A marker left over is an orphan. Only the marker line is dropped, never
+    # the content around it.
+    $stripped = [regex]::Replace($stripped, '(?im)^[ \t]*' + [regex]::Escape($startMarker) + '[ \t]*\r?\n?', '')
+    $stripped = [regex]::Replace($stripped, '(?im)^[ \t]*' + [regex]::Escape($endMarker) + '[ \t]*\r?\n?', '')
+
+    return $stripped
 }
 
 function Invoke-UninstallCommand {
@@ -1249,6 +1352,38 @@ function Invoke-UninstallCommand {
         }
     }
 
+    # Refuse to remove anything that lives inside the user profile or a system
+    # folder, not just the folder itself. The app itself is installed under
+    # %LOCALAPPDATA% or %APPDATA%, so those two are only protected exactly.
+    $appDataRoots = @()
+    foreach ($appDataRoot in @($env:LOCALAPPDATA, $env:APPDATA)) {
+        if (-not [string]::IsNullOrWhiteSpace($appDataRoot)) {
+            $appDataRoots += $appDataRoot.TrimEnd('\')
+        }
+    }
+    $containerRoots = @($env:USERPROFILE, $env:ProgramFiles, ${env:ProgramFiles(x86)}, $env:WINDIR)
+    foreach ($containerRoot in $containerRoots) {
+        if ([string]::IsNullOrWhiteSpace($containerRoot)) {
+            continue
+        }
+        $normalizedRoot = $containerRoot.TrimEnd('\')
+        if (-not $fullInstallDir.StartsWith($normalizedRoot + '\', [StringComparison]::OrdinalIgnoreCase)) {
+            continue
+        }
+        $underAppData = $false
+        foreach ($appDataRoot in $appDataRoots) {
+            if ($fullInstallDir.StartsWith($appDataRoot + '\', [StringComparison]::OrdinalIgnoreCase)) {
+                $underAppData = $true
+                break
+            }
+        }
+        if (-not $underAppData) {
+            Write-ErrorMessage "Refusing to remove a protected folder: $installDir"
+            Write-Host ''
+            return $false
+        }
+    }
+
     $installDir = $fullInstallDir
     $scriptRoot = if ([string]::IsNullOrWhiteSpace($script:ScriptRoot)) {
         ''
@@ -1264,10 +1399,13 @@ function Invoke-UninstallCommand {
     }
 
     # Do not remove a source checkout by accident. The installed app is not a
-    # git repository, so this only triggers for an explicit -InstallDir.
-    if (-not $Force -and (Test-Path -LiteralPath (Join-Path $installDir '.git') -PathType Container)) {
+    # git repository, so this only triggers for an explicit -InstallDir. This
+    # refusal is never waived by -Force, a mistyped path must not be able to
+    # delete a working copy.
+    if (Test-Path -LiteralPath (Join-Path $installDir '.git') -PathType Container) {
         Write-ErrorMessage "Refusing to remove a git repository: $installDir"
-        Write-Host '  Pass -Force if you really want to remove it.' -ForegroundColor ([ConsoleColor]::DarkGray)
+        Write-Host '  The installed app is never a repository, so this path is probably a mistake.' -ForegroundColor ([ConsoleColor]::DarkGray)
+        Write-Host '  Delete it by hand if that is really what you want.' -ForegroundColor ([ConsoleColor]::DarkGray)
         Write-Host ''
         return $false
     }
@@ -1343,35 +1481,20 @@ function Invoke-UninstallCommand {
                 $profileContent = ''
             }
             $originalProfile = $profileContent
-            $startMarker = '# >>> premiere-tui >>>'
-            $endMarker = '# <<< premiere-tui <<<'
-            $markedPattern = [regex]::Escape($startMarker) + '.*?' + [regex]::Escape($endMarker) + '\r?\n?'
-            while ($true) {
-                $stripped = [regex]::Replace(
-                    $profileContent,
-                    $markedPattern,
-                    '',
-                    [System.Text.RegularExpressions.RegexOptions]::Singleline
-                )
-                if ($stripped -eq $profileContent) {
-                    break
-                }
-                $profileContent = $stripped
-            }
-
-            $legacyPatterns = @(
-                '(?ms)^[ \t]*#\s*premiere-tui\s*\r?\n[ \t]*function\s+(?:global:|script:)?premiere-tui\s*\{.*?^\}[ \t]*\r?\n?',
-                '(?ms)^[ \t]*function\s+(?:global:|script:)?premiere-tui\s*\{.*?^\}[ \t]*\r?\n?'
-            )
-            foreach ($legacyPattern in $legacyPatterns) {
-                $profileContent = [regex]::Replace($profileContent, $legacyPattern, '')
-            }
+            $profileContent = Remove-PremiereProfileEntries -Content $profileContent
 
             if ($profileContent -ne $originalProfile) {
+                $candidate = $profileContent.Trim()
+                $parseErrors = $null
+                $parseTokens = $null
+                [System.Management.Automation.Language.Parser]::ParseInput($candidate, [ref]$parseTokens, [ref]$parseErrors) | Out-Null
+                if (@($parseErrors).Count -gt 0) {
+                    throw "Refusing to rewrite the profile, the result would not parse: $($parseErrors[0].Message)"
+                }
                 $profileBackup = $profilePath + '.bak-' + (Get-Date -Format 'yyyyMMdd-HHmmssfff')
                 Copy-Item -LiteralPath $profilePath -Destination $profileBackup -Force
                 $utf8Bom = New-Object System.Text.UTF8Encoding($true)
-                [System.IO.File]::WriteAllText($profilePath, $profileContent.Trim(), $utf8Bom)
+                [System.IO.File]::WriteAllText($profilePath, $candidate, $utf8Bom)
                 $profileChanged = $true
             }
         } catch {
@@ -1911,11 +2034,17 @@ if ($CommandOrName -eq 'config') {
         }
     }
     Invoke-ConfigCommand -Action $configAction
+    if (-not [string]::IsNullOrWhiteSpace([string]$script:ConfigCommandError)) {
+        exit 1
+    }
     exit 0
 }
 
 if ($CommandOrName -eq 'setup') {
     Invoke-ConfigCommand -Action 'setup'
+    if (-not [string]::IsNullOrWhiteSpace([string]$script:ConfigCommandError)) {
+        exit 1
+    }
     exit 0
 }
 

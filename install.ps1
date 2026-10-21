@@ -39,6 +39,11 @@ param(
     [switch]$NoProfile
 )
 
+# The result is reported through $global:LASTEXITCODE because this file is
+# commonly run with iex (irm ...), where exit would close the user's session.
+# The installer itself only sets it to 0 once it has finished successfully.
+$global:LASTEXITCODE = 1
+
 # Run in a child scope so preferences and helper functions do not leak into
 # the caller's session when this file is executed with iex (irm ...).
 & {
@@ -67,6 +72,107 @@ param(
     function Write-Fail {
         param([string]$Message)
         Write-Host "  [!!] $Message" -ForegroundColor ([ConsoleColor]::Red)
+    }
+
+    function Get-LegacyFunctionEnd {
+        # Returns the index of the line that closes the function that starts on
+        # $Start, or -1 when it is never closed. Braces are counted instead of
+        # matched by a regex so an indented function is closed by its own brace
+        # and never by an enclosing block.
+        param([string[]]$Lines, [int]$Start)
+
+        $depth = 0
+        $seenOpen = $false
+        for ($i = $Start; $i -lt $Lines.Count; $i++) {
+            $opens = ([regex]::Matches($Lines[$i], '\{')).Count
+            $closes = ([regex]::Matches($Lines[$i], '\}')).Count
+            if (-not $seenOpen) {
+                if ($opens -gt 0) {
+                    $seenOpen = $true
+                } else {
+                    continue
+                }
+            }
+            $depth += $opens - $closes
+            if ($depth -le 0) {
+                return $i
+            }
+        }
+        return -1
+    }
+
+    function Remove-LegacyProfileEntries {
+        # Removes an unmarked premiere-tui function and its ptui alias. These
+        # were written by older installers and by the manual setup snippet, so
+        # they are removed line by line instead of by a pattern that could
+        # reach past the end of the definition.
+        param([string]$Content)
+
+        if ([string]::IsNullOrEmpty($Content)) {
+            return $Content
+        }
+
+        $newline = if ($Content.Contains("`r`n")) { "`r`n" } else { "`n" }
+        $lines = $Content -split "`r?`n"
+        $kept = New-Object System.Collections.Generic.List[string]
+        $index = 0
+        while ($index -lt $lines.Count) {
+            $line = $lines[$index]
+            if ($line -match '^[ \t]*function\s+(?:global:|script:)?premiere-tui\b') {
+                $end = Get-LegacyFunctionEnd -Lines $lines -Start $index
+                if ($end -ge $index) {
+                    if ($kept.Count -gt 0 -and $kept[$kept.Count - 1] -match '^[ \t]*#\s*premiere-tui\s*$') {
+                        $kept.RemoveAt($kept.Count - 1)
+                    }
+                    $index = $end + 1
+                    continue
+                }
+            }
+            $kept.Add($line)
+            $index++
+        }
+
+        $result = $kept -join $newline
+
+        # A leftover ptui alias points at a function that is being replaced.
+        $result = [regex]::Replace($result, '(?im)^[ \t]*(?:Set-Alias|New-Alias)\s+[^\r\n]*\bptui\b[^\r\n]*\r?\n?', '')
+
+        return $result
+    }
+
+    function Remove-PremiereProfileEntries {
+        # Strips every premiere-tui entry from a PowerShell profile. Only the
+        # premiere-tui block and the legacy definition are touched, any other
+        # content in the profile is left exactly as it was.
+        param([string]$Content)
+
+        if ([string]::IsNullOrEmpty($Content)) {
+            return $Content
+        }
+
+        $startMarker = '# >>> premiere-tui >>>'
+        $endMarker = '# <<< premiere-tui <<<'
+
+        # The tempered dot stops a match from spanning a second start marker, so
+        # a half written block can never swallow the content around it.
+        $start = [regex]::Escape($startMarker)
+        $end = [regex]::Escape($endMarker)
+        $markedPattern = $start + '(?:(?!' + $start + ').)*?' + $end + '[ \t]*\r?\n?'
+        $stripped = [regex]::Replace(
+            $Content,
+            $markedPattern,
+            '',
+            [System.Text.RegularExpressions.RegexOptions]::Singleline
+        )
+
+        $stripped = Remove-LegacyProfileEntries -Content $stripped
+
+        # A marker left over is an orphan. Only the marker line is dropped, never
+        # the content around it.
+        $stripped = [regex]::Replace($stripped, '(?im)^[ \t]*' + [regex]::Escape($startMarker) + '[ \t]*\r?\n?', '')
+        $stripped = [regex]::Replace($stripped, '(?im)^[ \t]*' + [regex]::Escape($endMarker) + '[ \t]*\r?\n?', '')
+
+        return $stripped
     }
 
     $repoOwner = 'zakagain'
@@ -135,18 +241,24 @@ param(
             Write-Step 'Profile not modified (-NoProfile).'
             Write-Host ''
             Write-Host '  To add the command manually, put this in your PowerShell profile:' -ForegroundColor ([ConsoleColor]::DarkGray)
+            Write-Host "    # >>> premiere-tui >>>" -ForegroundColor ([ConsoleColor]::Gray)
             Write-Host "    function premiere-tui { & '$installScript' @args }" -ForegroundColor ([ConsoleColor]::Gray)
             Write-Host "    Set-Alias -Name ptui -Value premiere-tui -Scope Global -Force" -ForegroundColor ([ConsoleColor]::Gray)
+            Write-Host "    # <<< premiere-tui <<<" -ForegroundColor ([ConsoleColor]::Gray)
             Write-Host ''
+            $global:LASTEXITCODE = 0
             return
         }
 
         if ([string]::IsNullOrWhiteSpace($ProfilePath)) {
             Write-Fail 'Could not determine the PowerShell profile path.'
             Write-Host '  Add this to your profile manually:' -ForegroundColor ([ConsoleColor]::DarkGray)
+            Write-Host "    # >>> premiere-tui >>>" -ForegroundColor ([ConsoleColor]::Gray)
             Write-Host "    function premiere-tui { & '$installScript' @args }" -ForegroundColor ([ConsoleColor]::Gray)
             Write-Host "    Set-Alias -Name ptui -Value premiere-tui -Scope Global -Force" -ForegroundColor ([ConsoleColor]::Gray)
+            Write-Host "    # <<< premiere-tui <<<" -ForegroundColor ([ConsoleColor]::Gray)
             Write-Host ''
+            $global:LASTEXITCODE = 1
             return
         }
 
@@ -173,29 +285,9 @@ param(
         $startMarker = '# >>> premiere-tui >>>'
         $endMarker = '# <<< premiere-tui <<<'
 
-        # Remove every previous marked block.
-        $markedPattern = [regex]::Escape($startMarker) + '.*?' + [regex]::Escape($endMarker) + '\r?\n?'
-        while ($true) {
-            $stripped = [regex]::Replace(
-                $content,
-                $markedPattern,
-                '',
-                [System.Text.RegularExpressions.RegexOptions]::Singleline
-            )
-            if ($stripped -eq $content) {
-                break
-            }
-            $content = $stripped
-        }
-
-        # Remove the old hand-written function, with or without its comment.
-        $legacyPatterns = @(
-            '(?ms)^[ \t]*#\s*premiere-tui\s*\r?\n[ \t]*function\s+(?:global:|script:)?premiere-tui\s*\{.*?^\}[ \t]*\r?\n?',
-            '(?ms)^[ \t]*function\s+(?:global:|script:)?premiere-tui\s*\{.*?^\}[ \t]*\r?\n?'
-        )
-        foreach ($legacyPattern in $legacyPatterns) {
-            $content = [regex]::Replace($content, $legacyPattern, '')
-        }
+        # Remove every previous premiere-tui entry from the profile. Only the
+        # marked block and the legacy definition are touched.
+        $content = Remove-PremiereProfileEntries -Content $content
 
         $escapedInstallScript = $installScript.Replace("'", "''")
         $block = @"
@@ -211,6 +303,15 @@ $endMarker
             $block + [Environment]::NewLine
         } else {
             $content.Trim() + [Environment]::NewLine + [Environment]::NewLine + $block + [Environment]::NewLine
+        }
+
+        # Never write a profile that does not parse. The backup is already in
+        # place, so a failure here leaves the original profile untouched.
+        $parseErrors = $null
+        $parseTokens = $null
+        [System.Management.Automation.Language.Parser]::ParseInput($newContent, [ref]$parseTokens, [ref]$parseErrors) | Out-Null
+        if (@($parseErrors).Count -gt 0) {
+            throw "Refusing to rewrite the profile, the result would not parse: $($parseErrors[0].Message)"
         }
 
         $utf8Bom = New-Object System.Text.UTF8Encoding($true)
@@ -231,12 +332,23 @@ $endMarker
         Write-Host '  Uninstall:' -ForegroundColor ([ConsoleColor]::White)
         Write-Host '    premiere-tui uninstall' -ForegroundColor ([ConsoleColor]::Cyan)
         Write-Host ''
+        $global:LASTEXITCODE = 0
     } catch {
         Write-Fail $_.Exception.Message
         Write-Host ''
+        # The installer never calls exit, that would close the session of a
+        # user who ran it with iex (irm ...). The exit code is reported here.
+        $global:LASTEXITCODE = 1
     } finally {
         if ($null -ne $downloadRoot -and (Test-Path -LiteralPath $downloadRoot)) {
             try { Remove-Item -LiteralPath $downloadRoot -Recurse -Force -ErrorAction SilentlyContinue } catch { }
         }
     }
 } -Ref $Ref -InstallDir $InstallDir -ProfilePath $ProfilePath -SourcePath $SourcePath -NoProfile:$NoProfile
+
+# When this file runs as a file the result becomes the exit code of the
+# process. Under iex there is no script file, so this is never reached and the
+# session of the user is left alone.
+if (-not [string]::IsNullOrWhiteSpace($MyInvocation.MyCommand.Path)) {
+    exit $global:LASTEXITCODE
+}

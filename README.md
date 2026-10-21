@@ -197,11 +197,15 @@ Get-Alias ptui
 If the command is missing, re-run the installer or add this to your profile manually:
 
 ```powershell
+# >>> premiere-tui >>>
 function premiere-tui {
     & "$env:LOCALAPPDATA\premiere-tui\premiere.ps1" @args
 }
 Set-Alias -Name ptui -Value premiere-tui -Scope Global -Force
+# <<< premiere-tui <<<
 ```
+
+Keep the two marker lines. They tell `premiere-tui uninstall` which part of your profile belongs to the app, so everything else in the profile is left alone.
 
 ### Premiere does not open the project
 
@@ -272,6 +276,8 @@ premiere-tui uninstall -RemoveBackups   # also delete profile.ps1.bak-* files
 `-NoProfile` leaves the `# >>> premiere-tui >>>` block in your profile, so remove it yourself if you delete the app. Profile backups are kept by default. Running the uninstall from the source checkout only removes the installed copy in `%LOCALAPPDATA%`; the checkout itself stays.
 
 `-InstallDir`, `-ProfilePath`, and `-ConfigPath` override the uninstall targets; they are mainly useful for testing.
+
+The uninstaller refuses to delete anything that is not clearly the installed app. It refuses a drive root, `%USERPROFILE%`, `%APPDATA%`, `%LOCALAPPDATA%`, Program Files and Windows, anything inside your user profile or a system folder, a folder that contains the running script, and any git repository. That last one is never waived by `-Force`, so a mistyped `-InstallDir` cannot delete a source checkout.
 
 If the command is already gone, remove the folders manually and delete the `# >>> premiere-tui >>>` block from your profile (`$PROFILE`):
 
