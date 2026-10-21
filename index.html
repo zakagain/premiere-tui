@@ -364,23 +364,35 @@ input:focus-visible {
   gap: var(--space-8);
   grid-template-columns: minmax(0, 1fr);
   align-items: center;
+  justify-items: center;
+  text-align: center;
+}
+
+.hero-copy {
+  width: 100%;
+  max-width: 64ch;
+  align-items: center;
 }
 
 .hero-meta {
   margin-top: var(--space-2);
+  justify-content: center;
 }
 
 .hero-term {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+  width: 100%;
+  max-width: 940px;
 }
 
 .hero-note {
   font-size: var(--text-xs);
   line-height: 1.6;
   color: var(--muted);
-  max-width: 52ch;
+  max-width: 62ch;
+  margin-inline: auto;
 }
 
 /* ─── 7. Terminal window ──────────────────────────────────────────────── */
@@ -389,6 +401,7 @@ input:focus-visible {
   border-radius: var(--radius-lg);
   background: var(--terminal-bg);
   overflow: hidden;
+  text-align: left;
 }
 
 .term-bar {
@@ -906,11 +919,6 @@ input:focus-visible {
 
   .hero {
     padding-block: var(--space-12) var(--section-y-desktop);
-  }
-
-  .hero-grid {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
-    gap: var(--space-12);
   }
 
   .preview-grid {
