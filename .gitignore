@@ -1,0 +1,17 @@
+# Local configuration (normally lives in %APPDATA%\premiere-tui)
+config.json
+
+# Logs
+*.log
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# macOS
+.DS_Store
+
+# Premiere auto-save and project backups
+**/Adobe Premiere Pro Auto-Save/
+*.prproj.bak
+*.prproj.prm
