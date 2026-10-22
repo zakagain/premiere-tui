@@ -72,3 +72,4 @@ Get-Content "$root\profile.ps1" -Raw   # exactly one marked block, includes ptui
 - No package manifest, lockfile, CI, linter, or test runner. Do not invent npm/pip/pytest commands.
 - `.gitignore` ignores `config.json`, logs, and Premiere auto-save/backup files. Test configs belong in `%TEMP%`.
 - This machine may already have a real config in `%APPDATA%\premiere-tui` and an old unmarked `premiere-tui` function in the real profile. Both install and uninstall are designed to migrate/remove that function; do not edit `$PROFILE` manually during tests.
+- **Do not `git push` without explicit user permission.** All pushes must be requested; the agent should stage changes and report what is ready, then wait for the user to say "push" or "go ahead."

@@ -225,7 +225,123 @@ input:focus-visible {
   max-width: 18ch;
 }
 
-.section-title {
+/* A slow sheen that travels across the headline once the page has settled.
+   Two background layers: the first is the tint, the second is the sheen band.
+   background-clip: text keeps the word's colour while the band slides behind it. */
+@supports ((background-clip: text) or (-webkit-background-clip: text)) {
+  .hero-title {
+    color: transparent;
+    background-image:
+      linear-gradient(
+        100deg,
+        rgba(241, 245, 249, 0) 42%,
+        rgba(255, 255, 255, 0.85) 50%,
+        rgba(241, 245, 249, 0) 58%
+      ),
+      linear-gradient(180deg, #e6ebf2, #f8fafc);
+    background-size: 200% 100%, 100% 100%;
+    background-position: 130% 0, 0 0;
+    -webkit-background-clip: text;
+    background-clip: text;
+  }
+}
+
+/* ─── 11. Motion ─────────────────────────────────────────────────────── */
+/* On load the hero rises in, one element after the other. After that the
+   headline keeps a very slow sheen and the accent marks keep a slow pulse,
+   both slow enough to notice only if you wait for them. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sheen {
+  0% {
+    background-position: 130% 0, 0 0;
+  }
+  55% {
+    background-position: -30% 0, 0 0;
+  }
+  100% {
+    background-position: -30% 0, 0 0;
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.hero-copy > * {
+  animation: rise 640ms var(--ease-standard) both;
+}
+
+.hero-copy > *:nth-child(1) {
+  animation: rise 640ms var(--ease-standard) 60ms both;
+}
+
+.hero-copy > *:nth-child(2) {
+  animation: rise 640ms var(--ease-standard) 160ms both;
+}
+
+.hero-copy > *:nth-child(3) {
+  animation: rise 640ms var(--ease-standard) 260ms both;
+}
+
+.hero-copy > *:nth-child(4) {
+  animation: rise 640ms var(--ease-standard) 360ms both;
+}
+
+.hero .hero-copy > .hero-title {
+  animation:
+    rise 640ms var(--ease-standard) 160ms both,
+    sheen 12s var(--ease-standard) 3s infinite;
+}
+
+.hero-term {
+  animation: rise 640ms var(--ease-standard) 480ms both;
+}
+
+.badge-dot,
+.wordmark-mark {
+  animation: pulse 5s var(--ease-standard) infinite;
+}
+
+.hero-meta .badge:nth-child(2) .badge-dot {
+  animation-delay: 0.8s;
+}
+
+.hero-meta .badge:nth-child(3) .badge-dot {
+  animation-delay: 1.6s;
+}
+
+/* Sections below the fold fade in when they are scrolled to. The class is
+   added by the script, so without JavaScript the page is simply visible. */
+.reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  transition:
+    opacity 700ms var(--ease-standard),
+    transform 700ms var(--ease-standard);
+}
+
+.reveal.is-in {
+  opacity: 1;
+  transform: none;
+}
+
+/* ─── 12. Breakpoints ─────────────────────────────────────────────────── */
   font-size: clamp(1.75rem, 1.25rem + 2vw, 2.5rem);
   max-width: 24ch;
 }
@@ -1116,7 +1232,7 @@ input:focus-visible {
       </section>
 
       <!-- ── LIVE TUI PREVIEW ─────────────────────────────────────────── -->
-      <section class="section preview" id="preview">
+      <section class="section preview reveal" id="preview" data-reveal>
         <div class="container preview-grid">
           <div class="preview-copy od-stack" style="--od-gap: 18px">
             <p class="eyebrow">Live preview</p>
@@ -1205,7 +1321,7 @@ input:focus-visible {
       </section>
 
       <!-- ── QUICK CONFIGURATION ──────────────────────────────────────── -->
-      <section class="section config" id="config">
+      <section class="section config reveal" id="config" data-reveal>
         <div class="container">
           <div class="section-head od-stack" style="--od-gap: 14px">
             <p class="eyebrow">Configuration</p>
@@ -1260,7 +1376,7 @@ input:focus-visible {
     </main>
 
     <!-- ── FOOTER ─────────────────────────────────────────────────────── -->
-    <footer class="site-footer">
+    <footer class="site-footer reveal" data-reveal>
       <div class="container footer-inner">
         <div class="footer-brand od-row" style="--od-gap: 12px">
           <span class="wordmark-text">premiere-tui</span>
@@ -1467,6 +1583,21 @@ input:focus-visible {
 
     resolvePath();
   }
+
+  /* ── Scroll reveal ────────────────────────────────────────────────────── */
+  var revealTargets = all('[data-reveal]');
+  if (revealTargets.length) {
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('is-in');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { rootMargin: '0px 0px -10% 0px', threshold: 0.1 });
+    revealTargets.forEach(function (el) { observer.observe(el); });
+  }
+
 })();
 </script>
   </body>
