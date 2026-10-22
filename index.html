@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
   <head><script type="application/json" data-od-external-dependencies>["https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"]</script>
     <meta charset="utf-8" />
@@ -1065,7 +1065,7 @@ input:focus-visible {
   background: #ffffff;
   border-top: 1px solid #e5e5e7;
   border-bottom: 1px solid #e5e5e7;
-  padding-block: clamp(80px, 12vw, 140px);
+  padding-block: clamp(100px, 14vw, 180px);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -1080,12 +1080,12 @@ input:focus-visible {
 }
 
 .macos-logo-wrap {
-  margin-bottom: var(--space-8);
+  margin-bottom: var(--space-12);
 }
 
 .macos-logo {
-  width: clamp(140px, 22vw, 200px);
-  height: clamp(140px, 22vw, 200px);
+  width: clamp(160px, 25vw, 240px);
+  height: clamp(160px, 25vw, 240px);
   margin: 0 auto;
   display: block;
 }
@@ -1096,31 +1096,31 @@ input:focus-visible {
 
 .apple-rainbow {
   opacity: 0;
-  animation: apple-rainbow-phase 2.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.6s forwards;
+  animation: apple-rainbow-phase 2.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.8s forwards;
   transform-origin: center center;
 }
 
 @keyframes apple-black-fade {
   0% { opacity: 1; }
-  70% { opacity: 1; }
+  75% { opacity: 1; }
   100% { opacity: 0; }
 }
 
 @keyframes apple-rainbow-phase {
   0% {
     opacity: 0;
-    transform: scale(0.92);
-    filter: blur(4px);
+    transform: scale(0.9);
+    filter: blur(6px);
   }
-  30% {
-    opacity: 0.6;
-    transform: scale(1.02);
-    filter: blur(2px);
+  25% {
+    opacity: 0.4;
+    transform: scale(1.03);
+    filter: blur(3px);
   }
-  60% {
-    opacity: 0.9;
-    transform: scale(1.0);
-    filter: blur(0);
+  50% {
+    opacity: 0.8;
+    transform: scale(1.01);
+    filter: blur(1px);
   }
   100% {
     opacity: 1;
@@ -1130,71 +1130,53 @@ input:focus-visible {
 }
 
 .macos-headline {
-  margin: 0 0 var(--space-4);
-  font-size: clamp(1.875rem, 4vw, 2.75rem);
+  margin: 0 0 var(--space-6);
+  font-size: clamp(2rem, 4.5vw, 3rem);
   font-weight: 600;
-  line-height: 1.15;
+  line-height: 1.1;
   letter-spacing: -0.02em;
   color: #1d1d1f;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", sans-serif;
 }
 
 .macos-subtext {
-  margin: 0 auto var(--space-10);
-  max-width: 52ch;
-  font-size: clamp(1rem, 2vw, 1.125rem);
-  line-height: 1.6;
+  margin: 0 auto var(--space-14);
+  max-width: 54ch;
+  font-size: clamp(1.0625rem, 2.2vw, 1.1875rem);
+  line-height: 1.7;
   color: #6e6e73;
   font-weight: 400;
 }
 
-.macos-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--space-4);
-  margin-bottom: var(--space-6);
+.macos-cta {
+  margin-bottom: var(--space-10);
 }
 
-.macos-btn {
+.macos-mailto {
   display: inline-flex;
   align-items: center;
   gap: var(--space-3);
-  padding: 12px 24px;
+  padding: 14px 28px;
   border-radius: 999px;
   font-size: 1rem;
   font-weight: 500;
   line-height: 1;
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  text-decoration: none;
+  color: #ffffff;
+  background: #0071e3;
+  border: 1px solid #0071e3;
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", sans-serif;
 }
 
-.macos-btn:focus-visible {
+.macos-mailto:focus-visible {
   outline: none;
   box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.4);
 }
 
-.macos-btn-primary {
-  background: #0071e3;
-  color: #ffffff;
-  border-color: #0071e3;
-}
-
-.macos-btn-primary:hover {
+.macos-mailto:hover {
   background: #0060c7;
   border-color: #0060c7;
-}
-
-.macos-btn-secondary {
-  background: transparent;
-  color: #0071e3;
-  border-color: #0071e3;
-}
-
-.macos-btn-secondary:hover {
-  background: rgba(0, 113, 227, 0.08);
 }
 
 .macos-note {
@@ -1214,7 +1196,47 @@ input:focus-visible {
   .apple-rainbow { opacity: 1; }
 }
 
-/* ─── 13. Reduced motion ──────────────────────────────────────────────── */
+/* ── Cross-section fade transitions ─────────────────────────────────── */
+/* Smooth the transition from dark theme sections to the white macOS section */
+.section {
+  transition: background-color 0.6s ease, border-color 0.6s ease;
+}
+
+.config,
+.site-footer {
+  transition: background-color 0.6s ease, border-color 0.6s ease;
+}
+
+/* The macos-interest section sits between dark sections.
+   Add a subtle gradient fade at its edges so the transition isn't abrupt. */
+.macos-interest::before,
+.macos-interest::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 60px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.macos-interest::before {
+  top: 0;
+  background: linear-gradient(to bottom, #0b0f19 0%, #ffffff 100%);
+  opacity: 0.15;
+}
+
+.macos-interest::after {
+  bottom: 0;
+  background: linear-gradient(to top, #0b0f19 0%, #ffffff 100%);
+  opacity: 0.15;
+}
+
+.macos-interest {
+  position: relative;
+}
+
+/* ─── 13. Reduced motion ──────────────────────────────────────────────── *//* ─── 13. Reduced motion ──────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -1535,7 +1557,7 @@ input:focus-visible {
       <section class="section macos-interest" id="macos-interest" data-reveal>
         <div class="macos-container">
           <div class="macos-logo-wrap" aria-hidden="true">
-            <svg class="macos-logo" viewBox="0 0 120 120" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Apple logo">
+            <svg class="macos-logo" viewBox="0 0 48 56" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Apple logo">
               <defs>
                 <linearGradient id="rainbow-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
                   <stop offset="0%" stop-color="#E4002B" />   <!-- PMS 186 red -->
@@ -1547,27 +1569,34 @@ input:focus-visible {
                   <stop offset="100%" stop-color="#E4002B" />   <!-- PMS 186 red -->
                 </linearGradient>
                 <mask id="apple-mask">
-                  <path class="apple-shape" fill="white" d="M60 15 C35 15 15 35 15 60 C15 85 35 105 60 105 C75 105 88 100 97 90 C102 80 105 72 105 60 C105 35 85 15 60 15 Z M60 30 C78 30 92 44 92 62 C92 72 85 80 70 84 C66 85 60 92 48 88 C40 86 32 78 30 65 C28 50 38 38 48 30 C52 26 56 26 60 26 C64 26 68 28 70 32 C68 38 62 42 56 42 C52 42 48 38 48 34 C48 30 52 28 56 28 C58 28 60 30 60 30 Z"/>
+                  <path class="apple-shape" fill="white" d="M27.58 7.5 C16.2 7.5 7.2 16.5 7.2 27.5 C7.2 38.5 16.2 47.5 27.58 47.5 C35.5 47.5 42.2 43.5 45.8 39.5 C48.5 35.5 49.5 32.5 49.5 27.5 C49.5 16.5 42.5 7.5 27.58 7.5 Z M27.58 15 C36 15 42.5 21 42.5 27.5 C42.5 30.5 38.5 36 32 38 C30.5 38.5 27.5 41 24 39.5 C22.5 39 20.5 36.5 18.5 32.5 C17 29 21 22.5 24 21 C25.5 20 26.5 20 27.58 20 C28.5 20 29.5 21 30 23 C29.5 25.5 28.5 26.5 26.5 26.5 C25 26.5 24 25 24 24 C24 22.5 25.5 21 27 21 C28 21 28.5 22 28.5 23 Z"/>
                 </mask>
               </defs>
               <!-- Black logo (initial state) -->
-              <path class="apple-black" fill="#1d1d1f" d="M60 15 C35 15 15 35 15 60 C15 85 35 105 60 105 C75 105 88 100 97 90 C102 80 105 72 105 60 C105 35 85 15 60 15 Z M60 30 C78 30 92 44 92 62 C92 72 85 80 70 84 C66 85 60 92 48 88 C40 86 32 78 30 65 C28 50 38 38 48 30 C52 26 56 26 60 26 C64 26 68 28 70 32 C68 38 62 42 56 42 C52 42 48 38 48 34 C48 30 52 28 56 28 C58 28 60 30 60 30 Z"/>
+              <path class="apple-black" fill="#1d1d1f" d="M27.58 7.5 C16.2 7.5 7.2 16.5 7.2 27.5 C7.2 38.5 16.2 47.5 27.58 47.5 C35.5 47.5 42.2 43.5 45.8 39.5 C48.5 35.5 49.5 32.5 49.5 27.5 C49.5 16.5 42.5 7.5 27.58 7.5 Z M27.58 15 C36 15 42.5 21 42.5 27.5 C42.5 30.5 38.5 36 32 38 C30.5 38.5 27.5 41 24 39.5 C22.5 39 20.5 36.5 18.5 32.5 C17 29 21 22.5 24 21 C25.5 20 26.5 20 27.58 20 C28.5 20 29.5 21 30 23 C29.5 25.5 28.5 26.5 26.5 26.5 C25 26.5 24 25 24 24 C24 22.5 25.5 21 27 21 C28 21 28.5 22 28.5 23 Z"/>
               <!-- Rainbow logo (phased in) -->
-              <rect class="apple-rainbow" x="0" y="0" width="120" height="120" fill="url(#rainbow-gradient)" mask="url(#apple-mask)" />
+              <rect class="apple-rainbow" x="0" y="0" width="48" height="56" fill="url(#rainbow-gradient)" mask="url(#apple-mask)" />
             </svg>
           </div>
+
           <h2 class="macos-headline">Want premiere-tui on macOS?</h2>
-          <p class="macos-subtext">We are building a native Swift version for macOS — native menus, native shortcuts, native feel. No Electron, no wrapper.</p>
-          <div class="macos-actions">
-            <button class="macos-btn macos-btn-primary" type="button" data-macos-interest="yes">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-              Yes, I want this
-            </button>
-            <button class="macos-btn macos-btn-secondary" type="button" data-macos-interest="notify">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
-              Notify me when it is ready
-            </button>
+
+          <p class="macos-subtext">
+            I am building a native Swift version for macOS — native menus, native shortcuts,
+            native feel. No Electron, no wrapper. Just a clean, fast app that feels like
+            it belongs on a Mac.
+          </p>
+
+          <div class="macos-cta">
+            <a class="macos-mailto" href="mailto:hello@zakariyakhalid.dpdns.org?subject=macOS%20interest%20-%20premiere-tui&body=Hi%2C%0D%0A%0D%0AI%27d%20love%20to%20see%20premiere-tui%20on%20macOS.%20Here%27s%20what%20I%27d%20like%20to%20see%3A%0D%0A%0D%0A-%20Native%20Swift%20UI%20(or%20AppKit)%0D%0A-%20Native%20menus%20%26%20shortcuts%0D%0A-%20No%20Electron%2C%20no%20wrapper%0D%0A%0D%0AMy%20workflow%3A%20%5Bdescribe%20your%20editing%20setup%5D">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                <polyline points="22,6 12,13 2,6"></polyline>
+              </svg>
+              <span>Email me when the macOS beta opens</span>
+            </a>
           </div>
+
           <p class="macos-note">No spam. Just a short email when the beta opens.</p>
         </div>
       </section>
