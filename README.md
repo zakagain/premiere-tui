@@ -35,7 +35,7 @@ Create a new Adobe Premiere Pro project from a master template without leaving t
 Run this in PowerShell:
 
 ```powershell
-iex (irm https://raw.githubusercontent.com/zakagain/premiere-tui/main/install.ps1)
+irm https://raw.githubusercontent.com/zakagain/premiere-tui/main/install.ps1 | iex
 ```
 
 The installer:
