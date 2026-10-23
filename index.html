@@ -616,6 +616,11 @@ input:focus-visible {
   border-color: color-mix(in oklab, var(--success), transparent 55%);
 }
 
+.copy-btn.is-failed {
+  color: var(--warn);
+  border-color: color-mix(in oklab, var(--warn), transparent 55%);
+}
+
 .term-output {
   margin-top: var(--space-4);
   padding-top: var(--space-3);
@@ -1412,7 +1417,7 @@ input:focus-visible {
                   <button
                     type="button"
                     class="copy-btn"
-                    data-copy="irm https://raw.githubusercontent.com/zakagain/premiere-tui/main/install.ps1 | iex"
+                    data-cmd="irm https://raw.githubusercontent.com/zakagain/premiere-tui/main/install.ps1 | iex"
                   >
                     <svg
                       class="icon"
@@ -1725,6 +1730,16 @@ input:focus-visible {
     return copied;
   }
 
+  function selectFallback(button, text) {
+    // Last resort: select the text so user can press Ctrl+C manually
+    var range = document.createRange();
+    range.selectNodeContents(button.previousElementSibling || button);
+    var sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    return true; // indicates manual copy needed
+  }
+
   function copyText(text) {
     if (navigator.clipboard && window.isSecureContext) {
       return navigator.clipboard.writeText(text).then(
@@ -1732,28 +1747,46 @@ input:focus-visible {
           return true;
         },
         function () {
-          return fallbackCopy(text);
+          // Clipboard API failed (possibly blocked), try legacy
+          var legacy = fallbackCopy(text);
+          if (!legacy) {
+            // Both failed - signal that manual copy is needed
+            return Promise.resolve({ manual: true });
+          }
+          return legacy;
         }
       );
     }
-    return Promise.resolve(fallbackCopy(text));
+    // No Clipboard API or not secure context
+    var legacy = fallbackCopy(text);
+    if (!legacy) {
+      return Promise.resolve({ manual: true });
+    }
+    return Promise.resolve(legacy);
   }
 
-  all('[data-copy]').forEach(function (button) {
+  all('[data-cmd]').forEach(function (button) {
     var label = one('.copy-label', button);
     var timer = null;
 
     button.addEventListener('click', function () {
-      var text = button.getAttribute('data-copy') || '';
-      copyText(text).then(function (copied) {
+      var text = button.getAttribute('data-cmd') || '';
+      copyText(text).then(function (result) {
+        var copied = result === true;
+        var manual = result && result.manual === true;
         if (label) {
-          label.textContent = copied ? 'Copied' : 'Ctrl+C';
+          label.textContent = copied ? 'Copied' : manual ? 'Select + Ctrl+C' : 'Ctrl+C';
         }
         button.classList.toggle('is-copied', copied);
+        if (!copied && !manual) {
+          button.classList.add('is-failed');
+        }
         if (copyLive) {
           copyLive.textContent = copied
             ? 'Command copied to the clipboard.'
-            : 'Copy failed — select the command and press Ctrl+C.';
+            : manual
+              ? 'Auto-copy blocked — text selected, press Ctrl+C.'
+              : 'Copy failed — select the command and press Ctrl+C.';
         }
         window.clearTimeout(timer);
         timer = window.setTimeout(function () {
@@ -1761,7 +1794,11 @@ input:focus-visible {
             label.textContent = 'Copy';
           }
           button.classList.remove('is-copied');
+          button.classList.remove('is-failed');
         }, 1800);
+        if (manual) {
+          selectFallback(button, text);
+        }
       });
     });
   });
