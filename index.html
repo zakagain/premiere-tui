@@ -577,6 +577,8 @@ input:focus-visible {
   font-size: var(--text-sm);
   color: var(--fg);
   overflow-wrap: anywhere;
+  user-select: all;
+  -webkit-user-select: all;
 }
 
 .icon {
@@ -1730,76 +1732,72 @@ input:focus-visible {
     return copied;
   }
 
-  function selectFallback(button, text) {
-    // Last resort: select the text so user can press Ctrl+C manually
-    var range = document.createRange();
-    range.selectNodeContents(button.previousElementSibling || button);
-    var sel = window.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(range);
-    return true; // indicates manual copy needed
+  function selectFallback(button) {
+    // Select the command text (previous <code> element) for manual Ctrl+C
+    var codeEl = button.previousElementSibling;
+    if (codeEl && codeEl.classList.contains('term-cmd')) {
+      var range = document.createRange();
+      range.selectNodeContents(codeEl);
+      var sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      codeEl.focus();
+    }
+    return true;
   }
 
   function copyText(text) {
     if (navigator.clipboard && window.isSecureContext) {
       return navigator.clipboard.writeText(text).then(
+        function () { return true; },
         function () {
-          return true;
-        },
-        function () {
-          // Clipboard API failed (possibly blocked), try legacy
           var legacy = fallbackCopy(text);
-          if (!legacy) {
-            // Both failed - signal that manual copy is needed
-            return Promise.resolve({ manual: true });
-          }
+          if (!legacy) return Promise.resolve({ manual: true });
           return legacy;
         }
       );
     }
-    // No Clipboard API or not secure context
     var legacy = fallbackCopy(text);
-    if (!legacy) {
-      return Promise.resolve({ manual: true });
-    }
+    if (!legacy) return Promise.resolve({ manual: true });
     return Promise.resolve(legacy);
   }
 
-  all('[data-cmd]').forEach(function (button) {
+  function handleCopyClick(button) {
+    var text = button.getAttribute('data-cmd') || '';
     var label = one('.copy-label', button);
-    var timer = null;
+    copyText(text).then(function (result) {
+      var copied = result === true;
+      var manual = result && result.manual === true;
+      if (label) {
+        label.textContent = copied ? 'Copied' : manual ? 'Select + Ctrl+C' : 'Ctrl+C';
+      }
+      button.classList.toggle('is-copied', copied);
+      if (!copied && !manual) button.classList.add('is-failed');
+      if (copyLive) {
+        copyLive.textContent = copied
+          ? 'Command copied to the clipboard.'
+          : manual
+            ? 'Auto-copy blocked — text selected, press Ctrl+C.'
+            : 'Copy failed — select the command and press Ctrl+C.';
+      }
+      if (manual) selectFallback(button);
+      setTimeout(function () {
+        if (label) label.textContent = 'Copy';
+        button.classList.remove('is-copied');
+        button.classList.remove('is-failed');
+      }, 1800);
+    });
+  }
 
-    button.addEventListener('click', function () {
-      var text = button.getAttribute('data-cmd') || '';
-      copyText(text).then(function (result) {
-        var copied = result === true;
-        var manual = result && result.manual === true;
-        if (label) {
-          label.textContent = copied ? 'Copied' : manual ? 'Select + Ctrl+C' : 'Ctrl+C';
-        }
-        button.classList.toggle('is-copied', copied);
-        if (!copied && !manual) {
-          button.classList.add('is-failed');
-        }
-        if (copyLive) {
-          copyLive.textContent = copied
-            ? 'Command copied to the clipboard.'
-            : manual
-              ? 'Auto-copy blocked — text selected, press Ctrl+C.'
-              : 'Copy failed — select the command and press Ctrl+C.';
-        }
-        window.clearTimeout(timer);
-        timer = window.setTimeout(function () {
-          if (label) {
-            label.textContent = 'Copy';
-          }
-          button.classList.remove('is-copied');
-          button.classList.remove('is-failed');
-        }, 1800);
-        if (manual) {
-          selectFallback(button, text);
-        }
-      });
+  all('[data-cmd]').forEach(function (button) {
+    // Primary: click handler
+    button.addEventListener('click', function () { handleCopyClick(button); });
+    // Backup: mousedown fires before click, harder for blockers to suppress
+    button.addEventListener('mousedown', function (e) {
+      if (e.button === 0) { // left click only
+        handleCopyClick(button);
+        e.preventDefault(); // prevent duplicate click firing
+      }
     });
   });
 
