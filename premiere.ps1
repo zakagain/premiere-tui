@@ -686,6 +686,30 @@ function Save-Config {
     return $path
 }
 
+function Expand-PathVariables {
+    param([string]$Path)
+
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        return $Path
+    }
+
+    # Expand %VAR% (cmd-style)
+    $expanded = [System.Environment]::ExpandEnvironmentVariables($Path)
+
+    # Expand $env:VAR (PowerShell-style) - Environment.ExpandEnvironmentVariables
+    # does not handle $env:VAR, so we do it manually
+    $expanded = [regex]::Replace($expanded, '\$env:([A-Za-z_][A-Za-z0-9_]*)', {
+        param($match)
+        $varName = $match.Groups[1].Value
+        if (Test-Path "Env:$varName") {
+            return (Get-Item "Env:$varName").Value
+        }
+        return $match.Value
+    })
+
+    return $expanded
+}
+
 function Get-EffectiveConfig {
     param([object]$Config)
 
@@ -696,13 +720,13 @@ function Get-EffectiveConfig {
             try { $effective.version = [int]$Config.version } catch { }
         }
         if ($names -contains 'templateFolder') {
-            $effective.templateFolder = [string]$Config.templateFolder
+            $effective.templateFolder = Expand-PathVariables ([string]$Config.templateFolder)
         }
         if ($names -contains 'templateProjectFile') {
             $effective.templateProjectFile = [string]$Config.templateProjectFile
         }
         if ($names -contains 'projectsParentFolder') {
-            $effective.projectsParentFolder = [string]$Config.projectsParentFolder
+            $effective.projectsParentFolder = Expand-PathVariables ([string]$Config.projectsParentFolder)
         }
     }
 
@@ -785,8 +809,8 @@ function Save-ConfigFromValues {
         [object]$BaseConfig
     )
 
-    $templateValue = ([string]$Values[0]).Trim()
-    $projectsValue = ([string]$Values[1]).Trim()
+    $templateValue = Expand-PathVariables (([string]$Values[0]).Trim())
+    $projectsValue = Expand-PathVariables (([string]$Values[1]).Trim())
     $bundled = Get-BundledTemplateFolder
 
     $effectiveTemplate = if ([string]::IsNullOrWhiteSpace($templateValue)) { $bundled } else { $templateValue }
