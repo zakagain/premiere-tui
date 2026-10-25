@@ -1065,7 +1065,7 @@ input:focus-visible {
 }
 
 /* ─── macOS Interest Section ────────────────────────────────────────── */
-/* Completely different visual language: light, spacious, Apple Human Interface.
+/* Completely different visual language: light, spacious, Apple Human Interface Design.
    Font: SF Pro (system) falling back to Inter. White background.
    No dark surfaces, no cyan accents. */
 .macos-interest {
@@ -1098,94 +1098,43 @@ input:focus-visible {
 }
 
 .apple-black {
-  animation: apple-black-fade 1.2s ease-out forwards;
+  opacity: 1;
+  transition: opacity 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.apple-black.is-hidden {
+  opacity: 0;
 }
 
 .apple-rainbow {
+  opacity: 1;
+}
+
+.apple-rainbow path {
   opacity: 0;
-  animation: apple-rainbow-phase 2.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.8s forwards;
+  transform: scale(0.92) translateY(8px);
   transform-origin: center center;
+  transition:
+    opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+    filter 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  filter: blur(4px);
 }
 
-@keyframes apple-black-fade {
-  0% { opacity: 1; }
-  75% { opacity: 1; }
-  100% { opacity: 0; }
+.apple-rainbow path.is-visible {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+  filter: blur(0);
 }
 
-@keyframes apple-rainbow-phase {
-  0% {
-    opacity: 0;
-    transform: scale(0.9);
-    filter: blur(6px);
-  }
-  25% {
-    opacity: 0.4;
-    transform: scale(1.03);
-    filter: blur(3px);
-  }
-  50% {
-    opacity: 0.8;
-    transform: scale(1.01);
-    filter: blur(1px);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1);
-    filter: blur(0);
-  }
-}
-
-/* The rainbow logo is now a group of paths - animate the whole group */
-.apple-rainbow {
-  opacity: 0;
-  animation: apple-rainbow-phase 2.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.8s forwards;
-  transform-origin: center center;
-}
-
-.apple-black {
-  animation: apple-black-fade 1.2s ease-out forwards;
-}
-
-@keyframes apple-black-fade {
-  0% { opacity: 1; }
-  75% { opacity: 1; }
-  100% { opacity: 0; }
-}
-
-/* The rainbow logo starts hidden, then phases in */
-.apple-rainbow {
-  opacity: 0;
-  animation: apple-rainbow-phase 2.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.8s forwards;
-  transform-origin: center center;
-}@keyframes apple-black-fade {
-  0% { opacity: 1; }
-  75% { opacity: 1; }
-  100% { opacity: 0; }
-}
-
-@keyframes apple-rainbow-phase {
-  0% {
-    opacity: 0;
-    transform: scale(0.9);
-    filter: blur(6px);
-  }
-  25% {
-    opacity: 0.4;
-    transform: scale(1.03);
-    filter: blur(3px);
-  }
-  50% {
-    opacity: 0.8;
-    transform: scale(1.01);
-    filter: blur(1px);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1);
-    filter: blur(0);
-  }
-}
+/* Staggered delays for each color block */
+.apple-rainbow path:nth-child(1) { transition-delay: 0ms; }
+.apple-rainbow path:nth-child(2) { transition-delay: 80ms; }
+.apple-rainbow path:nth-child(3) { transition-delay: 160ms; }
+.apple-rainbow path:nth-child(4) { transition-delay: 240ms; }
+.apple-rainbow path:nth-child(5) { transition-delay: 320ms; }
+.apple-rainbow path:nth-child(6) { transition-delay: 400ms; }
+.apple-rainbow path:nth-child(7) { transition-delay: 480ms; }
 
 .macos-headline {
   margin: 0 0 var(--space-6);
@@ -1198,7 +1147,7 @@ input:focus-visible {
 }
 
 .macos-subtext {
-  margin: 0 auto var(--space-14);
+  margin: 0 auto var(--space-16);
   max-width: 54ch;
   font-size: clamp(1.0625rem, 2.2vw, 1.1875rem);
   line-height: 1.7;
@@ -1247,11 +1196,11 @@ input:focus-visible {
 /* Respect reduced motion for the logo animations */
 @media (prefers-reduced-motion: reduce) {
   .apple-black,
-  .apple-rainbow {
-    animation: none !important;
+  .apple-rainbow path {
+    transition: none !important;
   }
   .apple-black { opacity: 0; }
-  .apple-rainbow { opacity: 1; }
+  .apple-rainbow path { opacity: 1; transform: scale(1) translateY(0); filter: none; }
 }
 
 /* ── Cross-section fade transitions ─────────────────────────────────── */
@@ -1627,7 +1576,7 @@ input:focus-visible {
                 <path d="M40.762 41.78c-1.96 2.882-4.59 6.054-7.78 6.084-3.115.028-3.914-2.035-8.139-2.012s-5.107 2.048-8.22 2.018c-3.33-.03-5.916-3.145-7.886-6.087z"/>
               </g>
               <!-- Rainbow logo (phased in) - original colored paths from the CDN SVG -->
-              <g class="apple-rainbow" style="opacity: 0;">
+              <g class="apple-rainbow">
                 <path fill="#61bb46" stroke="#61bb46" stroke-miterlimit="2.613" stroke-width=".259" d="m5.652 17.412.044-.07c2.46-3.802 6.338-6.027 9.985-6.027 3.714 0 6.048 2.045 9.118 2.045 2.979 0 4.793-2.048 9.087-2.048 3.244 0 6.684 1.774 9.134 4.842-.678.372-1.289.795-1.835 1.26z"/>
                 <path fill="#61bb46" stroke="#61bb46" stroke-miterlimit="2.613" stroke-width=".259" d="M30.629 7.887c1.559-2.01 2.744-4.848 2.314-7.75-2.548.176-5.528 1.805-7.269 3.925-1.58 1.927-2.884 4.784-2.376 7.56 2.782.087 5.66-1.581 7.331-3.735z"/>
                 <path fill="#fdb827" d="M5.525 17.356c-1.06 1.665-1.792 4.053-1.986 6.147H37.89c.371-2.292 1.606-4.48 3.564-6.145zh.003z"/>
@@ -1642,22 +1591,19 @@ input:focus-visible {
           <h2 class="macos-headline">Want premiere-tui on macOS?</h2>
 
           <p class="macos-subtext">
-            I am building a native Swift version for macOS — native menus, native shortcuts,
-            native feel. No Electron, no wrapper. Just a clean, fast app that feels like
-            it belongs on a Mac.
+            I'm thinking of building the same thing, for macOS. Do you want it? 
           </p>
 
-          <div class="macos-cta">
-            <a class="macos-mailto" href="mailto:hello@zakariyakhalid.dpdns.org?subject=macOS%20interest%20-%20premiere-tui&body=Hi%2C%0D%0A%0D%0AI%27d%20love%20to%20see%20premiere-tui%20on%20macOS.%20Here%27s%20what%20I%27d%20like%20to%20see%3A%0D%0A%0D%0A-%20Native%20Swift%20UI%20(or%20AppKit)%0D%0A-%20Native%20menus%20%26%20shortcuts%0D%0A-%20No%20Electron%2C%20no%20wrapper%0D%0A%0D%0AMy%20workflow%3A%20%5Bdescribe%20your%20editing%20setup%5D">
+          <div class="macos-cta">            
+            <a class="macos-mailto" href="mailto:hello@zakariyakhalid.dpdns.org?subject=premiere-tui%20-%20macOS%20support&body=Hi%2C%0AI'd%20love%20to%20see%20premiere-tui%20natively%20support%20macOS.%20Here's%20some%20stuff%20about%20my%20Mac%0A-%20My%20macOS%20version%3A%20%5Bversion%5D%0A-%20My%20terminal%3A%20%5BmacOS%20native%2C%20Ghostty%2C%20iTerm%2C%20etc.%5D%0A%0AI%20%5Bwould%2Fwould%20not%5D%20like%20to%20test%20beta%20builds%0A%0AThanks!">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
                 <polyline points="22,6 12,13 2,6"></polyline>
               </svg>
-              <span>Email me when the macOS beta opens</span>
+              <span>Give it to me!</span>
             </a>
           </div>
 
-          <p class="macos-note">No spam. Just a short email when the beta opens.</p>
         </div>
       </section>
 
@@ -1910,6 +1856,29 @@ input:focus-visible {
       });
     }, { rootMargin: '0px 0px -10% 0px', threshold: 0.1 });
     revealTargets.forEach(function (el) { observer.observe(el); });
+  }
+
+  /* ── macOS logo animation on scroll ────────────────────────────────────── */
+  var macosSection = one('#macos-interest');
+  if (macosSection) {
+    var blackLogo = one('.apple-black', macosSection);
+    var rainbowPaths = all('.apple-rainbow path', macosSection);
+    var logoObserver = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          if (blackLogo) {
+            blackLogo.classList.add('is-hidden');
+          }
+          rainbowPaths.forEach(function (path, i) {
+            setTimeout(function () {
+              path.classList.add('is-visible');
+            }, i * 80);
+          });
+          logoObserver.unobserve(entry.target);
+        }
+      });
+    }, { rootMargin: '0px 0px -20% 0px', threshold: 0.15 });
+    logoObserver.observe(macosSection);
   }
 
 })();
